@@ -1,0 +1,20 @@
+<Project Sdk="Dalamud.NET.Sdk/13.0.0">
+
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<RootNamespace>VIWI.Modules.AoEasy</RootNamespace>
+		<AssemblyName>AoEasy</AssemblyName>
+		<Authors>Vera Nala</Authors>
+		<Version>0.0.0.1</Version>
+		<Description>Makes AoEing Easy</Description>
+		<IsPackable>false</IsPackable>
+		<LangVersion>latest</LangVersion>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\VIWI\VIWI.csproj" />
+		<ProjectReference Include="..\..\lib\ECommons\ECommons.csproj" />
+	</ItemGroup>
+
+</Project>

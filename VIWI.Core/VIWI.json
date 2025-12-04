@@ -1,0 +1,10 @@
+{
+  "Author": "Vera Nala",
+  "Name": "VIWI",
+  "Punchline": "Vera's Integrated World Improvements",
+  "Description": "Vera's Integrated World Improvements",
+  "Version": "0.0.1",
+  "DalamudApiLevel": 13,
+  "LoadPriority": 0,
+  "Tag": "General"
+}

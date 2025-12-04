@@ -1,0 +1,96 @@
+using Dalamud.Game;
+using Dalamud.Interface.Windowing;
+using Dalamud.IoC;
+using Dalamud.Plugin;
+using Dalamud.Plugin.Services;
+using ECommons;
+using ECommons.Logging;
+using VIWI.UI.Windows;
+
+namespace VIWI.Core;
+
+public sealed class VIWIPlugin : IDalamudPlugin
+{
+    public static string Name => "VIWI Core";
+    public const bool DEVMODE = false;
+    public static VIWIPlugin Instance { get; private set; } = null!;
+
+    public IDalamudPluginInterface PluginInterface { get; }
+    [PluginService] internal static IClientState ClientState { get; private set; } = null!;
+    [PluginService] internal static IPlayerState PlayerState { get; private set; } = null!;
+    [PluginService] internal static IObjectTable ObjectTable { get; private set; } = null!;
+    [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
+    [PluginService] internal static ITextureProvider TextureProvider { get; private set; } = null!;
+    [PluginService] internal static IGameGui GameGui { get; private set; } = null!;
+    [PluginService] internal static IFramework Framework { get; private set; } = null!;
+    [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
+    [PluginService] internal static ISigScanner SigScanner { get; private set; } = null!;
+    [PluginService] internal static IGameInteropProvider HookProvider { get; private set; } = null!;
+
+    internal readonly WindowSystem WindowSystem = new("VIWI");
+    internal MainDashboardWindow? MainWindow;
+
+    public VIWIPlugin(
+            IDalamudPluginInterface pluginInterface,
+            IClientState clientState,
+            IPlayerState playerState,
+            IObjectTable objectTable,
+            IDataManager dataManager,
+            ITextureProvider textureProvider,
+            IGameGui gameGui,
+            IFramework framework,
+            ICommandManager commandManager,
+            ISigScanner sigScanner,
+            IGameInteropProvider hookProvider)
+    {
+        Instance = this;
+        PluginInterface = pluginInterface;
+
+        VIWIContext.CorePlugin = this;
+        VIWIContext.PluginInterface = pluginInterface;
+        VIWIContext.ClientState = clientState;
+        VIWIContext.PlayerState = playerState;
+        VIWIContext.ObjectTable = objectTable;
+        VIWIContext.DataManager = dataManager;
+        VIWIContext.TextureProvider = textureProvider;
+        VIWIContext.GameGui = gameGui;
+        VIWIContext.Framework = framework;
+        VIWIContext.CommandManager = commandManager;
+        VIWIContext.SigScanner = sigScanner;
+        VIWIContext.HookProvider = hookProvider;
+
+        ECommonsMain.Init(pluginInterface, this);
+        PluginLog.Information("[VIWI] Core + ECommons initialized.");
+
+        MainWindow = new MainDashboardWindow();
+        WindowSystem.AddWindow(MainWindow);
+        PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
+        PluginInterface.UiBuilder.OpenMainUi += ToggleMainUI;
+        commandManager.AddHandler("/viwi", new Dalamud.Game.Command.CommandInfo(OnCommand)
+        {
+            HelpMessage = "Opens the VIWI dashboard."
+        });
+        ModuleManager.Initialize();
+    }
+
+    public void Dispose()
+    {
+        CommandManager.RemoveHandler("/viwi");
+        PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
+        PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUI;
+
+        if (MainWindow is not null)
+        {
+            WindowSystem.RemoveWindow(MainWindow);
+            MainWindow.Dispose();
+        }
+
+        ModuleManager.Dispose();
+        ECommonsMain.Dispose();
+        PluginLog.Information("[VIWI] Core + ECommons unloaded.");
+    }
+
+    private void ToggleMainUI() => MainWindow?.Toggle();
+
+    private void OnCommand(string command, string args) => ToggleMainUI();
+}
