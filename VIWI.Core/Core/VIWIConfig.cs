@@ -4,6 +4,7 @@ using Dalamud.Plugin.Services;
 using System;
 using VIWI.Modules.AoEasy;
 using VIWI.Modules.AutoLogin;
+using VIWI.Modules.Viwiwi;
 using VIWI.Modules.Workshoppa;
 
 namespace VIWI.Core
@@ -13,9 +14,11 @@ namespace VIWI.Core
     {
         public int Version { get; set; } = 1;
         public IPluginLog? pluginLog;
+        public const bool DEVMODE = false;
 
         public AoEasyConfig AoEasy { get; set; } = new();
         public AutoLoginConfig AutoLogin { get; set; } = new();
+        //public ViwiwiConfig Viwiwi { get; set; } = new();
         public WorkshoppaConfig Workshoppa { get; set; } = new();
 
 

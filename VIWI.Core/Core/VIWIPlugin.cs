@@ -10,7 +10,6 @@ namespace VIWI.Core;
 public sealed class VIWIPlugin : IDalamudPlugin
 {
     public static string Name => "VIWI Core";
-    public const bool DEVMODE = false;
     public static VIWIPlugin Instance { get; private set; } = null!;
     [PluginService] internal static IPluginLog PluginLog { get; private set; } = null!;
     [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;

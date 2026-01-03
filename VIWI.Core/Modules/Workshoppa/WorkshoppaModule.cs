@@ -123,7 +123,8 @@ internal sealed partial class WorkshoppaModule : VIWIModuleBase<WorkshoppaConfig
 
         if (CurrentStage != Stage.Stopped)
         {
-            _externalPluginHandler.Restore();
+            _externalPluginHandler?.RestoreTextAdvance();
+            _externalPluginHandler?.Restore();
             CurrentStage = Stage.Stopped;
         }
 
@@ -135,14 +136,13 @@ internal sealed partial class WorkshoppaModule : VIWIModuleBase<WorkshoppaConfig
 
     public override void Dispose()
     {
+        Disable();
+
         try
         {
             if (_ceruleumTankWindow != null) _ceruleumTankWindow.Dispose();
             if (_repairKitWindow != null) _repairKitWindow.Dispose();
             if (_mudstoneWindow != null) _mudstoneWindow.Dispose();
-
-            _externalPluginHandler?.RestoreTextAdvance();
-            _externalPluginHandler?.Restore();
         }
         catch (Exception)
         {
@@ -278,6 +278,7 @@ internal sealed partial class WorkshoppaModule : VIWIModuleBase<WorkshoppaConfig
 
                 case Stage.RequestStop:
                     _externalPluginHandler.Restore();
+                    _externalPluginHandler.RestoreTextAdvance();
                     _turninCount = 0;
                     _configuration.Mode = TurnInMode.Normal;
                     CurrentStage = Stage.Stopped;

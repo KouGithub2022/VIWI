@@ -128,7 +128,7 @@ namespace VIWI.UI.Pages
             ImGuiComponents.HelpMarker("Experimental: Will attempt to bypass Auth Errors.... I think?");
 
 
-            if (VIWIPlugin.DEVMODE)
+            if (VIWIConfig.DEVMODE)
             {
 #pragma warning disable CS0162 // Unreachable code detected
                 float toggleWidth = 60f;

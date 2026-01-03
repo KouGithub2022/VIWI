@@ -49,7 +49,7 @@ internal sealed partial class WorkshoppaModule
         }
         else if (_mudstoneWindow.IsOpen)
         {
-            PluginLog.Verbose($"Checking for Mudstone YesNo ({_mudstoneWindow.AutoBuyEnabled}, {_ceruleumTankWindow.IsAwaitingYesNo})");
+            PluginLog.Verbose($"Checking for Mudstone YesNo ({_mudstoneWindow.AutoBuyEnabled}, {_mudstoneWindow.IsAwaitingYesNo})");
             if (_mudstoneWindow.AutoBuyEnabled && _mudstoneWindow.IsAwaitingYesNo && _gameStrings.PurchaseItemForCompanyCredits.IsMatch(text))
             {
                 PluginLog.Information($"Selecting 'yes' ({text})");

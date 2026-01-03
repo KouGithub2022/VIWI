@@ -116,7 +116,7 @@ internal sealed unsafe class WorkshoppaMudstoneWindow : WorkshoppaShopWindowBase
             "Lvl 20 -> 70 - 66,061 Mudstone, (66 Stacks) - 2.04m\n" +
             "Lvl 20 -> 80 - 148,924 Mudstone, (149 Stacks) - 4.61m\n" +
             "Lvl 20 -> 90 - 329,422 Mudstone, (330 Stacks) - 10.2m\n" +
-            "Lvl 20 -> 100 - 668,303 Mudstone, (669 Stacks) - 20.7m");
+            "Note that after level 90, Workshop projects no longer grant EXP.");
 
         ImGui.Indent();
         ImGui.Text($"Mudstones: {FormatStackCount(mudstones)}");

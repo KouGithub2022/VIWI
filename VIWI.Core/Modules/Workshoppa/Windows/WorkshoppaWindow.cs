@@ -7,18 +7,14 @@ using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
-using Lumina.Data.Parsing;
 using System;
 using System.Collections.Generic;
-using System.Configuration;
 using System.Linq;
 using System.Numerics;
-using System.Security.Cryptography.Xml;
 using System.Text;
 using System.Text.RegularExpressions;
 using VIWI.Core;
 using VIWI.Modules.Workshoppa.GameData;
-using static VIWI.Modules.Workshoppa.WorkshoppaConfig;
 
 namespace VIWI.Modules.Workshoppa.Windows;
 
@@ -192,7 +188,8 @@ internal sealed class WorkshoppaWindow : Window
                 "Lvl 20 -> 70 - 66,061 Mudstone, (66 Stacks) - 2.04m\n" +
                 "Lvl 20 -> 80 - 148,924 Mudstone, (149 Stacks) - 4.61m\n" +
                 "Lvl 20 -> 90 - 329,422 Mudstone, (330 Stacks) - 10.2m\n" +
-                "Lvl 20 -> 100 - 668,303 Mudstone, (669 Stacks) - 20.7m") ;
+                "Note that after level 90, Workshop projects no longer grant EXP.");
+
             ImGui.EndDisabled();
             ShowErrorConditions();
         }
@@ -292,7 +289,7 @@ internal sealed class WorkshoppaWindow : Window
 
     private void Save()
     {
-        //Core.Save();
+        WorkshoppaModule.Instance?.SaveConfig();
     }
 
     public void Toggle(EOpenReason reason)

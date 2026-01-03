@@ -1,6 +1,5 @@
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
-using ECommons.Throttlers;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
@@ -57,8 +56,6 @@ internal sealed partial class WorkshoppaModule
 
     private void SelectCraftBranch()
     {
-        if (!EzThrottler.Throttle("Workshoppa.SelectCraftBranch", 200))
-            return;
         if (_turninCount >= 3 && _configuration.Mode == TurnInMode.Leveling && (SelectSelectString("Discontinue", 2, s => s.StartsWith("Discontinue project.", StringComparison.Ordinal))))
         {
             CurrentStage = Stage.DiscontinueProject;
@@ -239,7 +236,7 @@ internal sealed partial class WorkshoppaModule
 
         _externalPluginHandler.SaveTextAdvance();
 
-        PluginLog.Information($"Contributing {item.ItemCountPerStep}x {item.ItemName} (itemId={item.ItemId})");
+        PluginLog.Information($"Contributing Specific {item.ItemCountPerStep}x {item.ItemName} (itemId={item.ItemId})");
         _contributingItemId = item.ItemId;
 
         var contributeMaterial = stackalloc AtkValue[]
@@ -339,11 +336,11 @@ internal sealed partial class WorkshoppaModule
     }
     private unsafe void ConfirmMaterialDeliveryFollowUp()
     {
-        AtkUnitBase* addonMaterialDelivery = GetMaterialDeliveryAddon();
+        var addonMaterialDelivery = GetMaterialDeliveryAddon();
         if (addonMaterialDelivery == null)
             return;
 
-        CraftState? craftState = ReadCraftState(addonMaterialDelivery);
+        var craftState = ReadCraftState(addonMaterialDelivery);
         if (craftState == null || craftState.ResultItem == 0)
         {
             PluginLog.Warning("Could not parse craft state");
@@ -352,13 +349,25 @@ internal sealed partial class WorkshoppaModule
         }
 
         var item = craftState.Items.SingleOrDefault(x => x.ItemId == _contributingItemId);
-        item.StepsComplete++;
         if (item.ItemId == 0)
         {
             PluginLog.Warning($"Contributing item {_contributingItemId} not found in CraftState.");
             CurrentStage = Stage.RequestStop;
             return;
         }
+        item.StepsComplete++;
+
+        if (craftState.IsPhaseComplete())
+        {
+            SaveConfig();
+            CurrentStage = Stage.TargetFabricationStation;
+            _continueAt = DateTime.Now.AddSeconds(0.5);
+            return;
+        }
+
+        _configuration.CurrentlyCraftedItem!.ContributedItemsInCurrentPhase
+            .Single(x => x.ItemId == item.ItemId)
+            .QuantityComplete = item.QuantityComplete;
 
         if (_configuration.Mode == WorkshoppaConfig.TurnInMode.Leveling)
         {
@@ -367,13 +376,15 @@ internal sealed partial class WorkshoppaModule
 
             if (_turninCount >= 3)
             {
+                SaveConfig();
                 CurrentStage = Stage.CloseDeliveryMenu;
                 _continueAt = DateTime.Now.AddSeconds(2);
                 return;
             }
         }
+
         SaveConfig();
         CurrentStage = Stage.ContributeMaterials;
-        _continueAt = DateTime.Now.AddSeconds(0.2);
+        _continueAt = DateTime.Now.AddSeconds(1);
     }
 }
