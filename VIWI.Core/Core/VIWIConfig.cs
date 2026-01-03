@@ -4,7 +4,7 @@ using Dalamud.Plugin.Services;
 using System;
 using VIWI.Modules.AoEasy;
 using VIWI.Modules.AutoLogin;
-using VIWI.Modules.Viwiwi;
+//using VIWI.Modules.Viwiwi;
 using VIWI.Modules.Workshoppa;
 
 namespace VIWI.Core
