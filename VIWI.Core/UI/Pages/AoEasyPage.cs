@@ -1,5 +1,8 @@
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
+using ECommons.ImGuiMethods;
+using System.Numerics;
+using VIWI.Helpers;
 using VIWI.Modules.AoEasy;
 
 namespace VIWI.UI.Pages
@@ -31,8 +34,15 @@ namespace VIWI.UI.Pages
                 return;
             }
             ImGuiHelpers.ScaledDummy(4f);
-            ImGui.TextUnformatted($"AoEasy – Stop Running Away From Me! - V{Version}");
-            ImGui.TextUnformatted($"Enabled: {config.Enabled}");
+            ImGui.TextUnformatted($"AoEasy - V{Version}");
+            ImGui.SameLine();
+            ImGui.TextColored(GradientColor.Get(ImGuiHelper.RainbowColorStart, ImGuiHelper.RainbowColorEnd, 500), "Stop Running Away From Me!");
+            ImGui.TextUnformatted("Enabled:");
+            ImGui.SameLine();
+            ImGui.TextColored(
+                config.Enabled ? new Vector4(0.3f, 1f, 0.3f, 1f) : new Vector4(1f, 0.3f, 0.3f, 1f),
+                config.Enabled ? "Yes" : "No - Click the OFF button to Enable AoEasy!!"
+            );
             ImGuiHelpers.ScaledDummy(4f);
             ImGui.Separator();
 

@@ -50,6 +50,13 @@ public sealed class VIWIPlugin : IDalamudPlugin
         Instance = this;
         PluginInterface = pluginInterface;
 
+        var raw = PluginInterface.GetPluginConfig();
+        if (raw != null && raw is not VIWIConfig)
+            PluginLog.Warning($"[VIWI] CONFIG mismatch: {raw.GetType().FullName} (expected {typeof(VIWIConfig).FullName}). Recreating defaults.");
+
+        var config = raw as VIWIConfig ?? new VIWIConfig();
+        config.Initialize(PluginInterface);
+
         VIWIContext.CorePlugin = this;
         VIWIContext.PluginInterface = pluginInterface;
         VIWIContext.PluginLog = pluginLog;
@@ -70,7 +77,7 @@ public sealed class VIWIPlugin : IDalamudPlugin
         ECommonsMain.Init(pluginInterface, this);
         PluginLog.Information("Core + ECommons initialized.");
 
-        MainWindow = new MainDashboardWindow();
+        MainWindow = new MainDashboardWindow(config);
         WindowSystem.AddWindow(MainWindow);
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUI;
@@ -80,12 +87,6 @@ public sealed class VIWIPlugin : IDalamudPlugin
             HelpMessage = "Opens the VIWI dashboard."
         });
 
-        var raw = PluginInterface.GetPluginConfig();
-        if (raw != null && raw is not VIWIConfig)
-            PluginLog.Warning($"[VIWI] CONFIG mismatch: {raw.GetType().FullName} (expected {typeof(VIWIConfig).FullName}). Recreating defaults.");
-
-        var config = raw as VIWIConfig ?? new VIWIConfig();
-        config.Initialize(PluginInterface);
         ModuleManager.Initialize(config);
     }
 

@@ -1,7 +1,10 @@
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility;
+using ECommons.Configuration;
 using ECommons.ImGuiMethods;
+using ECommons.Logging;
 using System.Numerics;
 using VIWI.Core;
 using VIWI.Helpers;
@@ -14,19 +17,12 @@ namespace VIWI.UI.Pages
         public string DisplayName => "AutoLogin";
         public string Category => "Modules";
         public string Version => AutoLoginModule.ModuleVersion;
+        public bool SupportsEnableToggle => true;
+        public bool IsEnabled => AutoLoginModule.Enabled;
+        public void SetEnabled(bool value) => AutoLoginModule.Instance?.SetEnabled(value);
 
         public bool debugEnabled = false;
-        public bool SupportsEnableToggle => true;
-
-        public bool IsEnabled
-        {
-            get => AutoLoginModule.Enabled;
-        }
-
-        public void SetEnabled(bool value)
-        {
-            AutoLoginModule.Instance?.SetEnabled(value);
-        }
+        private string _newLoginCmd = string.Empty;
 
         public void Draw()
         {
@@ -39,8 +35,15 @@ namespace VIWI.UI.Pages
             }
             ImGuiHelpers.ScaledDummy(4f);
             ImGui.TextUnformatted($"AutoLogin - V{Version}");
+            ImGui.SameLine();
             ImGui.TextColored(GradientColor.Get(ImGuiHelper.RainbowColorStart, ImGuiHelper.RainbowColorEnd, 500), "DDoS Begone!");
-            ImGui.TextUnformatted($"Enabled: {config.Enabled}");
+            ImGui.TextUnformatted("Enabled:");
+            ImGui.SameLine();
+            ImGui.TextColored(
+                config.Enabled ? new Vector4(0.3f, 1f, 0.3f, 1f) : new Vector4(1f, 0.3f, 0.3f, 1f),
+                config.Enabled ? "Yes" : "No - Click the OFF button to Enable AutoLogin!!"
+            );
+
             ImGuiHelpers.ScaledDummy(4f);
             ImGui.Separator();
             ImGuiHelpers.ScaledDummy(8f);
@@ -51,6 +54,7 @@ namespace VIWI.UI.Pages
                 "and attempt to automatically reconnect to them in the event of a sudden disconnect.\n" +
                 "In addition, AutoLogin prevents your client from killing itself on any lobby/disconnection errors."
             );
+            ImGuiHelpers.ScaledDummy(8f);
             ImGui.Separator();
             ImGuiHelpers.ScaledDummy(8f);
 
@@ -67,13 +71,12 @@ namespace VIWI.UI.Pages
             }
             else
             {
-                ImGui.TextDisabled("No Character Detected" + 
-                "\nAutoLogin updates character data on Logins, as well as World/Area changes" + 
+                ImGui.TextDisabled("No Character Detected" +
+                "\nAutoLogin updates character data on Logins, as well as World/Area changes" +
                 "\nIf you're logged in and seeing this message, move around!");
             }
-                
+
             ImGuiHelpers.ScaledDummy(8f);
-            
             ImGui.Separator();
             ImGuiHelpers.ScaledDummy(8f);
 
@@ -90,7 +93,7 @@ namespace VIWI.UI.Pages
                 config.HCCurrentWorldName = config.CurrentWorldName;
                 config.HCvDataCenterID = config.vDataCenterID;
                 config.HCvDataCenterName = config.vDataCenterName;
-                AutoLoginModule.Instance?.SaveConfig();
+                module?.SaveConfig();
             }
             ImGuiComponents.HelpMarker("--- Hardcore Mode will save your preferred character ---\nThis prioritizes logging back into the stored character \nin the event of a disconnect rather than the one \nyou were currently on (unless its the same one, duh!).");
             if (HCMode)
@@ -105,7 +108,7 @@ namespace VIWI.UI.Pages
                     }
                     ImGui.TextUnformatted($"Home Data Center: {config.HCDataCenterName} ({config.HCDataCenterID})");
                 }
-                else 
+                else
                 {
                     ImGui.TextDisabled("No Character Detected\n" +
                     "\nAutoLogin updates your preferred character when you check the box!" +
@@ -115,18 +118,156 @@ namespace VIWI.UI.Pages
                 }
             }
 
-            ImGuiHelpers.ScaledDummy(8f);
-            ImGui.Separator();
+            ImGuiHelpers.ScaledDummy(2f);
 
             bool skipAuth = config.SkipAuthError;
 
             if (ImGui.Checkbox("Skip Auth", ref skipAuth))
             {
                 config.SkipAuthError = skipAuth;
-                AutoLoginModule.Instance?.SaveConfig();
+                module?.SaveConfig();
             }
             ImGuiComponents.HelpMarker("Experimental: Will attempt to bypass Auth Errors.... I think?");
 
+            ImGuiHelpers.ScaledDummy(8f);
+            ImGui.Separator();
+            ImGuiHelpers.ScaledDummy(8f);
+
+            ImGui.TextUnformatted("Login Chat Commands");
+            ImGuiHelpers.ScaledDummy(4f);
+
+            bool runLoginCommands = config.RunLoginCommands;
+
+            if (ImGui.Checkbox("Run commands after successful disconnect recovery", ref runLoginCommands))
+            {
+                config.RunLoginCommands = runLoginCommands;
+                module?.SaveConfig();
+            }
+            ImGuiComponents.HelpMarker(
+                "These commands run once after the game reports a successful login.\n" +
+                "Commands are executed with a small delay between each."
+            );
+            bool skipWhenAR = config.ARActiveSkipLoginCommands;
+            if (ImGui.Checkbox("Skip login commands when AutoRetainer is active", ref skipWhenAR))
+            {
+                config.ARActiveSkipLoginCommands = skipWhenAR;
+                module?.SaveConfig();
+            }
+            ImGuiComponents.HelpMarker("When Enabled, if AutoRetainer is Busy or in MultiMode, AutoLogin will not run custom login commands.");
+            ImGuiHelpers.ScaledDummy(6f);
+
+            config.LoginCommands ??= [];
+
+            int? pendingRemove = null;
+            int? pendingMoveFrom = null;
+            int? pendingMoveTo = null;
+            ImGui.PushID("login_cmd_add");
+            bool submit = ImGui.InputTextWithHint("##new_login_cmd", "Add command (e.g. /viwi)", ref _newLoginCmd, 512, ImGuiInputTextFlags.EnterReturnsTrue);
+
+            ImGui.SameLine();
+
+            submit |= ImGuiComponents.IconButton("add", FontAwesomeIcon.Plus);
+
+            if (submit)
+            {
+                var cmd = _newLoginCmd.Trim();
+
+                if (!string.IsNullOrWhiteSpace(cmd))
+                {
+                    if (!cmd.StartsWith('/'))
+                        cmd = "/" + cmd;
+
+                    if (!config.LoginCommands.Contains(cmd))
+                    {
+                        config.LoginCommands.Add(cmd);
+                        module?.SaveConfig();
+                    }
+
+                    _newLoginCmd = string.Empty;
+
+                    ImGui.SetKeyboardFocusHere();
+                }
+            }
+
+            ImGui.PopID();
+
+            if (config.LoginCommands.Count == 0)
+            {
+                ImGui.TextDisabled("No login commands set.");
+            }
+            else
+            {
+                for (int i = 0; i < config.LoginCommands.Count; i++)
+                {
+                    var cmd = config.LoginCommands[i] ?? string.Empty;
+
+                    ImGui.PushID(cmd);
+                    bool actionQueued = pendingRemove.HasValue || pendingMoveFrom.HasValue;
+
+                    if (actionQueued) ImGui.BeginDisabled();
+
+                    // Up
+                    bool canUp = i > 0;
+                    if (!canUp) ImGui.BeginDisabled();
+                    if (ImGuiComponents.IconButton("up", FontAwesomeIcon.ArrowUp))
+                    {
+                        pendingMoveFrom = i;
+                        pendingMoveTo = i - 1;
+                    }
+                    if (!canUp) ImGui.EndDisabled();
+
+                    ImGui.SameLine();
+
+                    // Down
+                    bool canDown = i < config.LoginCommands.Count - 1;
+                    if (!canDown) ImGui.BeginDisabled();
+                    if (ImGuiComponents.IconButton("down", FontAwesomeIcon.ArrowDown))
+                    {
+                        pendingMoveFrom = i;
+                        pendingMoveTo = i + 1;
+                    }
+                    if (!canDown) ImGui.EndDisabled();
+
+                    ImGui.SameLine();
+
+                    if (ImGuiComponents.IconButton("delete", FontAwesomeIcon.Trash))
+                    {
+                        pendingRemove = i;
+                    }
+                    if (actionQueued) ImGui.EndDisabled();
+
+                    ImGui.SameLine();
+                    ImGui.TextUnformatted(cmd);
+
+                    ImGui.PopID();
+                }
+            }
+            if (pendingRemove.HasValue)
+            {
+                config.LoginCommands.RemoveAt(pendingRemove.Value);
+                module?.SaveConfig();
+            }
+            else if (pendingMoveFrom.HasValue && pendingMoveTo.HasValue)
+            {
+                MoveItem(config.LoginCommands, pendingMoveFrom.Value, pendingMoveTo.Value);
+                module?.SaveConfig();
+            }
+
+            ImGuiHelpers.ScaledDummy(8f);
+            ImGui.Separator();
+            ImGuiHelpers.ScaledDummy(8f);
+
+            ImGui.TextUnformatted($"VIWI has helped you recover from: {config.DCsRecovered} Connection Errors");
+            if (config.DCsRecovered == 0)
+            {
+                ImGui.TextColored(GradientColor.Get(ImGuiHelper.RainbowColorStart, ImGuiHelper.RainbowColorEnd, 500), "What are you, an OCE player??");
+            }
+            else if (config.DCsRecovered > 0 && config.DCsRecovered < 5)
+            {
+                ImGui.TextColored(GradientColor.Get(ImGuiHelper.RainbowColorStart, ImGuiHelper.RainbowColorEnd, 500), "Typical NA Server day.");
+            }
+            else
+                ImGui.TextColored(GradientColor.Get(ImGuiHelper.RainbowColorStart, ImGuiHelper.RainbowColorEnd, 500), "YOSHIP SAVE US!! PLEASE WE'RE BEGGING YOU!!");
 
             if (VIWIConfig.DEVMODE)
             {
@@ -146,21 +287,26 @@ namespace VIWI.UI.Pages
                 {
                     debugEnabled = !debugEnabled;
 
-                    if (AutoLoginModule.Instance != null && debugEnabled == true)
+                    if (module != null && debugEnabled == true)
                     {
-                        AutoLoginModule.Instance.StartAutoLogin();
-                    }
-                    else
-                    {
-                        ImGuiHelpers.ScaledDummy(4f);
-                        ImGui.TextColored(new Vector4(1f, 0.3f, 0.3f, 1f),
-                            "AutoLogin module is not initialized (Instance is null).");
+                        module?.TestLoginCommandsNow();
+                        PluginLog.Information("Testing Login Commands");
                     }
                 }
+                ImGuiComponents.HelpMarker("Runs the same command queue that would execute after a successful login.");
                 ImGui.PopStyleColor(3);
                 ImGui.PopStyleVar(2);
 #pragma warning restore CS0162 // Unreachable code detected
             }
         }
+        private static void MoveItem<T>(System.Collections.Generic.List<T> list, int from, int to)
+        {
+            if (from == to) return;
+            if (from < 0 || from >= list.Count) return;
+            if (to < 0 || to >= list.Count) return;
+
+            (list[from], list[to]) = (list[to], list[from]);
+        }
+
     }
 }

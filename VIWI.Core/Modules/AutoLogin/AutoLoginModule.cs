@@ -3,12 +3,12 @@ using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Hooking;
 using Dalamud.Plugin.Services;
 using ECommons;
+using ECommons.Automation;
 using ECommons.Automation.NeoTaskManager;
 using ECommons.Automation.UIInput;
 using ECommons.ExcelServices;
 using ECommons.Throttlers;
 using ECommons.UIHelpers.AddonMasterImplementations;
-using FFXIVClientStructs.FFXIV.Client.Game.Gauge;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using Lumina.Excel.Sheets;
@@ -17,6 +17,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using VIWI.Core;
 using VIWI.Helpers;
+using VIWI.IPC;
 using static VIWI.Core.VIWIContext;
 
 namespace VIWI.Modules.AutoLogin
@@ -24,7 +25,7 @@ namespace VIWI.Modules.AutoLogin
     internal unsafe class AutoLoginModule : VIWIModuleBase<AutoLoginConfig>
     {
         public const string ModuleName = "AutoLogin";
-        public const string ModuleVersion = "1.0.4";
+        public const string ModuleVersion = "1.0.6";
         public override string Name => ModuleName;
         public override string Version => ModuleVersion;
         public AutoLoginConfig _configuration => ModuleConfig;
@@ -41,6 +42,7 @@ namespace VIWI.Modules.AutoLogin
 
 
         private readonly TaskManager taskManager = new();
+        private readonly AutoRetainerIPC _autoRetainerIPC = new();
 
         //internal IntPtr StartHandler;
         //internal IntPtr LoginHandler;
@@ -53,6 +55,8 @@ namespace VIWI.Modules.AutoLogin
 
         private DateTime _lastErrorEpisode = DateTime.MinValue;
         private bool _inErrorRecovery = false;
+        private bool _disconnected;
+        private bool _pendingLoginCommands;
 
         // ----------------------------
         // Module Base
@@ -132,17 +136,26 @@ namespace VIWI.Modules.AutoLogin
 
         private void OnLogin()
         {
+            if (!_configuration.Enabled || !_disconnected) return;
             PluginLog.Information("[AutoLogin] Successfully logged in, auto-login finished.");
+            _configuration.DCsRecovered++;
             UpdateConfig();
-            
+
+            if (_configuration.RunLoginCommands && _configuration.LoginCommands.Count > 0 && _disconnected)
+                _pendingLoginCommands = true;
+
+            _disconnected = false;
         }
         private void OnLogout(int type, int code)
         {
             if (!_configuration.Enabled) return;
 
+            _pendingLoginCommands = false;
+
             if ((code == 90001 || code == 90002) || code == 90006 || code == 90007)
             {
                 PluginLog.Information($"[AutoLogin] Disconnection Detected! Type {type}, Error Code {code}");
+                _disconnected = true;
 
                 if (_inErrorRecovery) return;
 
@@ -211,13 +224,6 @@ namespace VIWI.Modules.AutoLogin
             SaveConfig();
         }
 
-        private void OnCommand(string command, string args)
-        {
-            _configuration.Enabled = !_configuration.Enabled;
-            SaveConfig();
-            PluginLog.Information($"[AutoLogin] Auto-login {(_configuration.Enabled ? "enabled" : "disabled")}.");
-        }
-
         private void OnFrameworkUpdate(IFramework _)
         {
             if (!_configuration.Enabled) return;
@@ -251,6 +257,11 @@ namespace VIWI.Modules.AutoLogin
             }
 
             if (taskManager.IsBusy) return;
+
+            if (_pendingLoginCommands)
+            {
+                RunLoginCommands();
+            }
         }
 
         #region LoginLoop
@@ -568,20 +579,81 @@ namespace VIWI.Modules.AutoLogin
             {
                 var m = new AddonMaster.SelectYesno((void*)yesnoPtr);
                 if (m.Text.Contains("Log in", StringComparison.OrdinalIgnoreCase) || m.Text.Contains("Logging in", StringComparison.OrdinalIgnoreCase) || m.Text.Contains("last logged out", StringComparison.Ordinal) ||                        //NA
-                    m.Text.Contains("でログインします", StringComparison.OrdinalIgnoreCase) || /*m.Text.Contains("Logging in", StringComparison.OrdinalIgnoreCase) ||*/ m.Text.Contains("環境で最後にログ", StringComparison.Ordinal) ||              //JP
-                    m.Text.Contains("einloggen?", StringComparison.OrdinalIgnoreCase) || /*m.Text.Contains("Logging in", StringComparison.OrdinalIgnoreCase) ||*/ m.Text.Contains("ausgeloggt hast", StringComparison.Ordinal) ||                //DE
-                    m.Text.Contains("Se connecter", StringComparison.OrdinalIgnoreCase) || /*m.Text.Contains("Logging in", StringComparison.OrdinalIgnoreCase) ||*/ m.Text.Contains("dernière connexion n'a pas", StringComparison.Ordinal))     //FR
+                    m.Text.Contains("でログインします", StringComparison.OrdinalIgnoreCase) || m.Text.Contains("環境で最後にログ", StringComparison.Ordinal) ||              //JP
+                    m.Text.Contains("einloggen?", StringComparison.OrdinalIgnoreCase) || m.Text.Contains("eingeloggt", StringComparison.OrdinalIgnoreCase) || m.Text.Contains("ausgeloggt hast", StringComparison.Ordinal) ||                //DE
+                    m.Text.Contains("Se connecter", StringComparison.OrdinalIgnoreCase) || m.Text.Contains("connecter avec", StringComparison.OrdinalIgnoreCase) || m.Text.Contains("dernière connexion n'a pas", StringComparison.Ordinal))     //FR
                 {
                     if (EzThrottler.Throttle("ConfirmLogin", 150))
                     {
                         PluginLog.Debug("[AutoLogin] Confirming login...");
                         m.Yes();
+
                     }
                 }
                 return false;
             }
 
             return false;
+        }
+        #endregion
+
+        #region Step 4.5 - PostLogin Processes
+
+        private void RunLoginCommands()
+        {
+            if (!_configuration.Enabled) return;
+            if (!_configuration.RunLoginCommands) return;
+
+            if (ARActiveSkipLoginCommands())
+                return;
+
+            if (_configuration.LoginCommands.Count == 0)
+                return;
+
+            foreach (var cmd in _configuration.LoginCommands)
+            {
+                taskManager.EnqueueDelay(250);
+                taskManager.Enqueue(() =>
+                {
+                    try
+                    {
+                        Chat.ExecuteCommand(cmd);
+                        PluginLog.Information($"[AutoLogin] Ran login command: {cmd}");
+                    }
+                    catch (Exception ex)
+                    {
+                        PluginLog.Warning(ex, $"[AutoLogin] Failed to run login command: {cmd}");
+                    }
+                    return true;
+                }, $"AutoLogin.RunCmd:{cmd}");
+            }
+        }
+        private bool ARActiveSkipLoginCommands()
+        {
+            if (!_configuration.ARActiveSkipLoginCommands)
+                return false;
+
+            if (!_autoRetainerIPC.IsLoaded)
+                return false;
+
+            var busy = _autoRetainerIPC.IsBusy?.Invoke() == true;
+            var multi = _autoRetainerIPC.GetMultiModeEnabled?.Invoke() == true;
+            if (busy || multi)
+            {
+                PluginLog.Information($"[AutoLogin] Skipping login commands: AutoRetainer active (busy={busy}, multi={multi}).");
+                return true;
+            }
+            return false;
+        }
+        public static string NormalizeCommand(string cmd)
+        {
+            if (string.IsNullOrWhiteSpace(cmd)) return string.Empty;
+            cmd = cmd.Trim();
+            return cmd.StartsWith('/') ? cmd : "/" + cmd;
+        }
+        public void TestLoginCommandsNow()
+        {
+            RunLoginCommands();
         }
         #endregion
     }

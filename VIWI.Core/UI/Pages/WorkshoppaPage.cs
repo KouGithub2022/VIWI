@@ -4,6 +4,7 @@ using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility;
 using Dalamud.Plugin.Services;
 using ECommons.ImGuiMethods;
+using System.Numerics;
 using VIWI.Helpers;
 using VIWI.Modules.Workshoppa;
 using static FFXIVClientStructs.FFXIV.Client.UI.AddonActionCross;
@@ -39,8 +40,14 @@ namespace VIWI.UI.Pages
             ImGuiHelpers.ScaledDummy(4f);
 
             ImGui.TextUnformatted($"Workshoppa - V{Version}");
+            ImGui.SameLine();
             ImGui.TextColored(GradientColor.Get(ImGuiHelper.RainbowColorStart, ImGuiHelper.RainbowColorEnd, 500), "Workshop Project Automation");
-            ImGui.TextUnformatted($"Enabled: {config.Enabled}");
+            ImGui.TextUnformatted("Enabled:");
+            ImGui.SameLine();
+            ImGui.TextColored(
+                config.Enabled ? new Vector4(0.3f, 1f, 0.3f, 1f) : new Vector4(1f, 0.3f, 0.3f, 1f),
+                config.Enabled ? "Yes" : "No - Click the OFF button to Enable Workshoppa!!"
+            );
             ImGuiHelpers.ScaledDummy(4f);
             ImGui.Separator();
             ImGuiHelpers.ScaledDummy(8f);

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace VIWI.Modules.AutoLogin
 {
@@ -34,5 +35,10 @@ namespace VIWI.Modules.AutoLogin
         public int HCvDataCenterID { get; set; } = 0;
         public string HCvDataCenterName { get; set; } = "";
 
+        public int DCsRecovered { get; set; } = 0;
+
+        public bool RunLoginCommands = false;
+        public bool ARActiveSkipLoginCommands = true;
+        public List<string> LoginCommands = new();
     }
 }
