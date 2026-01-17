@@ -59,11 +59,6 @@ internal sealed class CharacterSwitch : IDisposable
         _commandManager.AddHandler("/k+", new CommandInfo(NextCharacter) { ShowInHelp = false });
         _commandManager.AddHandler("/k-", new CommandInfo(PreviousCharacter) { ShowInHelp = false });
         _commandManager.AddHandler("/ks", new CommandInfo(PickCharacter) { ShowInHelp = false });
-        _commandManager.AddHandler("/aripc", new CommandInfo(ArIpcDebug)
-        {
-            HelpMessage = "Debug AutoRetainer IPC (prints CIDs + first few offline infos)"
-        });
-
         _dtrBarEntry = dtrBar.Get(DtrBarTitle, "Unknown Character Index");
         _dtrBarEntry.OnClick = OnDtrClick;
         if (_clientState.IsLoggedIn)
@@ -77,48 +72,6 @@ internal sealed class CharacterSwitch : IDisposable
             catch (Exception ex)
             {
                 _pluginLog.Error(ex, "[KitchenSink] Scheduled CharacterSwitch action failed");
-            }
-        });
-    }
-    private void ArIpcDebug(string command, string arguments)
-    {
-        _framework.RunOnFrameworkThread(() =>
-        {
-            try
-            {
-                _chatGui.Print($"[KitchenSink] AR IsLoaded={_autoRetainer.IsLoaded} Ready={_autoRetainer.Ready}");
-
-                var cids = _autoRetainer.GetRegisteredCIDs();
-                _chatGui.Print($"[KitchenSink] AR RegisteredCIDs: {(cids == null ? "null" : cids.Count.ToString())}");
-
-                if (cids == null || cids.Count == 0)
-                    return;
-
-                int shown = 0;
-                foreach (var cid in cids)
-                {
-                    var info = _autoRetainer.GetOfflineCharacterInfo(cid);
-
-                    if (info == null)
-                    {
-                        _chatGui.Print($"[KitchenSink] CID={cid} -> info=NULL");
-                    }
-                    else
-                    {
-                        _chatGui.Print($"[KitchenSink] CID={cid} -> Name='{info.Name}' World='{info.World}' ExR={info.ExcludeRetainer} ExW={info.ExcludeWorkshop}");
-                    }
-
-                    shown++;
-                    if (shown >= 5) break;
-                }
-
-                _chatGui.Print($"[KitchenSink] LocalContentId={_clientState.LocalContentId}");
-                _chatGui.Print($"[KitchenSink] Player HomeWorld='{_clientState.LocalPlayer?.HomeWorld.Value.Name.ToString()}' CurrentWorld='{_clientState.LocalPlayer?.CurrentWorld.Value.Name.ToString()}'");
-            }
-            catch (Exception ex)
-            {
-                _pluginLog.Error(ex, "[KitchenSink] /aripc debug failed");
-                _chatGui.PrintError("[KitchenSink] /aripc debug failed (see log).", null, null);
             }
         });
     }
