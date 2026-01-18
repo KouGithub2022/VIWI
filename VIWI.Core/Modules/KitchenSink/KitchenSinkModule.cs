@@ -29,6 +29,7 @@ namespace VIWI.Modules.KitchenSink
         private CharacterSwitch? _characterSwitch;
         private DropboxQueue? _dropboxQueue;
         private GlamourSetter? _glamourSetter;
+        private WeaponIcons? _weaponIcons;
         private WeatherForecast? _weatherForecast;
         private BunnyBlessed? _bunnyBlessed;
         private Leves? _leves;
@@ -97,6 +98,11 @@ namespace VIWI.Modules.KitchenSink
                 ClientState,
                 ChatGui,
                 _configuration);
+            if (_configuration.WeaponIconsEnabled)
+            {
+                _weaponIcons ??= new WeaponIcons(GameGui, KeyState, DataManager, TextureProvider, PluginLog, _configuration);
+                PluginInterface.UiBuilder.Draw += _weaponIcons.Draw;
+            }
             PluginInterface.UiBuilder.Draw += _windowSystem.Draw;
 
             if (_glamourSetter != null)
@@ -116,6 +122,12 @@ namespace VIWI.Modules.KitchenSink
 
             if (_weatherForecast != null)
                 _windowSystem.RemoveWindow(_weatherForecast);
+            if (_weaponIcons != null)
+            {
+                PluginInterface.UiBuilder.Draw -= _weaponIcons.Draw;
+                _weaponIcons.Dispose();
+                _weaponIcons = null;
+            }
 
             _leves?.Dispose();
             _bunnyBlessed?.Dispose();

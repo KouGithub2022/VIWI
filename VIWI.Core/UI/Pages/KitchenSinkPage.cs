@@ -82,7 +82,11 @@ namespace VIWI.UI.Pages
             ImGuiHelpers.ScaledDummy(8f);
 
             DrawPerCharacterSection(config, module);
+            ImGuiHelpers.ScaledDummy(8f);
+            ImGui.Separator();
+            ImGuiHelpers.ScaledDummy(8f);
 
+            DrawWeaponIconsSection(config, module);
             ImGuiHelpers.ScaledDummy(8f);
             ImGui.Separator();
             ImGuiHelpers.ScaledDummy(8f);
@@ -245,7 +249,36 @@ namespace VIWI.UI.Pages
                 }
             }
         }
+        private void DrawWeaponIconsSection(KitchenSinkConfig config, KitchenSinkModule module)
+        {
+            if (!ImGui.CollapsingHeader("Weapon Icons (Armoury Board Overlay)", ImGuiTreeNodeFlags.DefaultOpen))
+                return;
 
+            ImGui.PushID("WeaponIconsSettings");
+
+            bool enabled = config.WeaponIconsEnabled;
+            if (ImGui.Checkbox("Enable Weapon Icons overlay", ref enabled))
+            {
+                config.WeaponIconsEnabled = enabled;
+                module.SaveConfig();
+            }
+            ImGuiComponents.HelpMarker("Draws job/role icons over Armoury Board item slots.");
+
+            bool requireCtrl = config.WeaponIconsRequireCtrl;
+            if (ImGui.Checkbox("Require Ctrl key", ref requireCtrl))
+            {
+                config.WeaponIconsRequireCtrl = requireCtrl;
+                module.SaveConfig();
+            }
+            ImGuiComponents.HelpMarker("When enabled, overlay only appears while holding Ctrl.");
+            bool mini = config.WeaponIconsMiniMode;
+            if (ImGui.Checkbox("Mini mode (bottom-left icons)", ref mini))
+            {
+                config.WeaponIconsMiniMode = mini;
+                module.SaveConfig();
+            }
+            ImGuiComponents.HelpMarker("Draws smaller icons anchored to the bottom-left of each Armoury slot.");
+        }
         private static void DrawCommandsCheatsheet()
         {
             ImGui.TextUnformatted("Commands:");

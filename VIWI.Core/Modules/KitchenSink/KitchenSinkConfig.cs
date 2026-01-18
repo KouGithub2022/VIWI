@@ -23,4 +23,8 @@ public class KitchenSinkConfig
 
     public List<CharacterData> Characters { get; set; } = new List<CharacterData>();
     public bool ShowOnlyMissingGlamourSets { get; set; } = true;
+
+    public bool WeaponIconsEnabled { get; set; } = false;
+    public bool WeaponIconsRequireCtrl { get; set; } = false;
+    public bool WeaponIconsMiniMode { get; set; } = true;
 }
