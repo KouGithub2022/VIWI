@@ -121,6 +121,30 @@ namespace VIWI.UI.Pages
             // Spruce Log: 2334 EXP each, turn-in size 55 => always multiple of 55
             var (btnQtyText, btnEligible, btnStatusText) = WorkshoppaHelpers.ComputeRow(dm, ps, btn, config.BtnTargetLevel, hasPreferredWorldBonus, minRequiredLevel: 50, expPerMaterial: 2334, materialsPerTurnin: 55);
 
+            // Resolve localized item names for display (prefer Japanese/localized names when available)
+            string GetItemNameLocalized(uint id, string fallback)
+            {
+                try
+                {
+                    var itemSheet = dm.GetExcelSheet<Lumina.Excel.Sheets.Item>();
+                    if (itemSheet != null)
+                    {
+                        foreach (var row in itemSheet)
+                        {
+                            if (row.RowId == id)
+                                return row.Name.ToString();
+                        }
+                    }
+                }
+                catch { }
+
+                return fallback;
+            }
+
+            var elmName = GetItemNameLocalized(5367, "Elm Lumber");
+            var mudstoneName = GetItemNameLocalized(5229, "Mudstone");
+            var spruceName = GetItemNameLocalized(5395, "Spruce Log");
+
             if (ImGui.BeginTable("WorkshoppaLevelTargets", 6, ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.RowBg))
             {
                 ImGui.TableSetupColumn("Enable", ImGuiTableColumnFlags.WidthFixed);
@@ -130,7 +154,7 @@ namespace VIWI.UI.Pages
                 ImGui.TableSetupColumn("Required Material", ImGuiTableColumnFlags.WidthStretch);
                 ImGui.TableSetupColumn("Quantity", ImGuiTableColumnFlags.WidthStretch);
                 ImGui.SameLine();
-                ImGuiComponents.HelpMarker("This takes Road-To-90 status into consideration! Buy whatever number you see!");
+                ImGuiComponents.HelpMarker("This takes Road-To-80 status into consideration! Buy whatever number you see!");
                 ImGui.TableHeadersRow();
 
                 void JobRow(ref bool active, string label, ClassJob? job, ref int targetValue, string reqMat, int qtyText, bool eligible, string statusText)
@@ -200,15 +224,27 @@ namespace VIWI.UI.Pages
                     ImGui.TextUnformatted(reqMat);
 
                     ImGui.TableNextColumn();
+                    var qtyStr = qtyText.ToString();
                     if (eligible)
-                        ImGui.TextUnformatted($"{qtyText}");
+                        ImGui.TextUnformatted(qtyStr);
                     else
-                        ImGui.TextDisabled($"{qtyText}");
+                        ImGui.TextDisabled(qtyStr);
+
+                    // Right-click quantity to copy to clipboard
+                    // ImGui mouse button 1 == right click
+                    if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+                    {
+                        try
+                        {
+                            ImGui.SetClipboardText(qtyStr);
+                        }
+                        catch { }
+                    }
                 }
 
-                JobRow(ref config.CrpTargetActive, "CRP", crp, ref config.CrpTargetLevel, "Elm Lumber", crpQtyText, crpEligible, crpStatusText);
-                JobRow(ref config.MinTargetActive, "MIN", min, ref config.MinTargetLevel, "Mudstone", minQtyText, minEligible, minStatusText);
-                JobRow(ref config.BtnTargetActive, "BTN", btn, ref config.BtnTargetLevel, "Spruce Log", btnQtyText, btnEligible, btnStatusText);
+                JobRow(ref config.CrpTargetActive, "CRP", crp, ref config.CrpTargetLevel, elmName, crpQtyText, crpEligible, crpStatusText);
+                JobRow(ref config.MinTargetActive, "MIN", min, ref config.MinTargetLevel, mudstoneName, minQtyText, minEligible, minStatusText);
+                JobRow(ref config.BtnTargetActive, "BTN", btn, ref config.BtnTargetLevel, spruceName, btnQtyText, btnEligible, btnStatusText);
 
                 ImGui.EndTable();
             }

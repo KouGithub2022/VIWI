@@ -13,6 +13,7 @@ using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using InteropGenerator.Runtime;
 using VIWI.Helpers;
+using System.Text;
 using VIWI.Modules.Workshoppa.GameData;
 using static VIWI.Core.VIWIContext;
 
@@ -102,26 +103,91 @@ internal sealed partial class WorkshoppaModule
         if (entries <= 0)
             return false;
 
-        if (choice < 0 || choice >= entries)
-            return false;
-
         var entryNames = menu.EntryNames;
         if (entryNames == null)
             return false;
 
-        CStringPointer textPointer = entryNames[choice];
-        if (!textPointer.HasValue)
+        // If choice == -1, search all entries for a predicate match. Otherwise target the specific index.
+        if (choice == -1)
+        {
+            for (int i = 0; i < entries; ++i)
+            {
+                CStringPointer textPointer = entryNames[i];
+                if (!textPointer.HasValue)
+                    continue;
+
+                var raw = MemoryHelper.ReadSeStringNullTerminated(new nint(textPointer)).ToString();
+                if (string.IsNullOrEmpty(raw))
+                    continue;
+
+                var sb = new StringBuilder(raw.Length);
+                foreach (var ch in raw)
+                {
+                    if (ch == '\n' || ch == '\r')
+                        continue;
+                    if (char.IsControl(ch))
+                        continue;
+                    if ((ch >= '\uE000' && ch <= '\uF8FF') || ch == '\u00A0' || ch == '\u200B' || ch == '\uFEFF')
+                        continue;
+                    sb.Append(ch);
+                }
+
+                var text = sb.ToString().Trim();
+                PluginLog.Verbose($"SelectSelectString({marker}): choice {i}/{entries} '{text}'");
+                try
+                {
+                    var codes = string.Join(' ', text.Select(c => $"U+{((int)c):X4}"));
+                    PluginLog.Verbose($"SelectSelectString({marker}): codes {i}/{entries} {codes}");
+                }
+                catch { }
+
+                if (predicate(text))
+                {
+                    PluginLog.Information($"SelectSelectString({marker}): matched entry {i}/{entries} '{text}', firing callback");
+                    addonSelectString->AtkUnitBase.FireCallbackInt(i);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        if (choice < 0 || choice >= entries)
             return false;
 
-        var text = MemoryHelper.ReadSeStringNullTerminated(new nint(textPointer)).ToString();
-        if (string.IsNullOrEmpty(text))
+        CStringPointer ptr = entryNames[choice];
+        if (!ptr.HasValue)
             return false;
 
-        PluginLog.Verbose($"SelectSelectString({marker}): choice {choice}/{entries} '{text}'");
-
-        if (!predicate(text))
+        var raw2 = MemoryHelper.ReadSeStringNullTerminated(new nint(ptr)).ToString();
+        if (string.IsNullOrEmpty(raw2))
             return false;
 
+        var sb2 = new StringBuilder(raw2.Length);
+        foreach (var ch in raw2)
+        {
+            if (ch == '\n' || ch == '\r')
+                continue;
+            if (char.IsControl(ch))
+                continue;
+            if ((ch >= '\uE000' && ch <= '\uF8FF') || ch == '\u00A0' || ch == '\u200B' || ch == '\uFEFF')
+                continue;
+            sb2.Append(ch);
+        }
+
+        var text2 = sb2.ToString().Trim();
+        PluginLog.Verbose($"SelectSelectString({marker}): choice {choice}/{entries} '{text2}'");
+        try
+        {
+            var codes2 = string.Join(' ', text2.Select(c => $"U+{((int)c):X4}"));
+            PluginLog.Verbose($"SelectSelectString({marker}): codes {choice}/{entries} {codes2}");
+        }
+        catch { }
+
+        if (!predicate(text2))
+            return false;
+
+        PluginLog.Information($"SelectSelectString({marker}): matched entry {choice}/{entries} '{text2}', firing callback");
         addonSelectString->AtkUnitBase.FireCallbackInt(choice);
         return true;
     }

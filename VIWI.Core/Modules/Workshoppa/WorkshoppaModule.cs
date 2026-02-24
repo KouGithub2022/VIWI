@@ -75,6 +75,40 @@ internal sealed partial class WorkshoppaModule : VIWIModuleBase<WorkshoppaConfig
     {
         Instance = this;
         base.Initialize(config);
+        // Config migration: bump default target levels to 90 for older configs
+        try
+        {
+            if (_configuration != null && _configuration.Version < 2)
+            {
+                var changed = false;
+                if (_configuration.CrpTargetLevel == 60)
+                {
+                    _configuration.CrpTargetLevel = 80;
+                    changed = true;
+                }
+                if (_configuration.MinTargetLevel == 60)
+                {
+                    _configuration.MinTargetLevel = 80;
+                    changed = true;
+                }
+                if (_configuration.BtnTargetLevel == 60)
+                {
+                    _configuration.BtnTargetLevel = 80;
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    _configuration.Version = 2;
+                    SaveConfig();
+                    PluginLog.Information("[Workshoppa] Upgraded config target levels to 90 and saved.");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Warning(ex, "Failed to migrate Workshoppa config");
+        }
         _externalPluginHandler = new ExternalPluginHandler(PluginInterface, PluginLog);
         _workshopCache = new WorkshopCache(DataManager, PluginLog);
         _gameStrings = new(DataManager, PluginLog);

@@ -33,10 +33,10 @@ namespace VIWI.Modules.Workshoppa
             if (lvl < minRequiredLevel)
                 return (0, false, $"Requires Lv {minRequiredLevel} (you are Lv {lvl})");
 
-            if (lvl >= 90)
-                return (0, false, "Already Lv 90");
+            if (lvl >= 80)
+                return (0, false, "Already Lv 80");
 
-            int mult = (hasPreferredWorldBonus && lvl < 90) ? 2 : 1;
+            int mult = (hasPreferredWorldBonus && lvl < 80) ? 2 : 1;
 
             int expRemaining = ExpCalc.GetExpRemainingToLevel(dm, ps, job.Value, targetLevel);
 
@@ -62,7 +62,7 @@ namespace VIWI.Modules.Workshoppa
         public static int ClampTargetLevel(int value)
         {
             if (value < 1) return 1;
-            if (value > 90) return 90;
+            if (value > 80) return 80;
             return value;
         }
 

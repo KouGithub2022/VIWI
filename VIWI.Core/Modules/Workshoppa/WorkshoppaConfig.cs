@@ -95,11 +95,12 @@ public sealed class WorkshoppaConfig
     }
 
     public bool CrpTargetActive = false;
-    public int CrpTargetLevel = 60;
+    // Default target level set to 80
+    public int CrpTargetLevel = 80;
 
     public bool MinTargetActive = false;
-    public int MinTargetLevel = 60;
+    public int MinTargetLevel = 80;
 
     public bool BtnTargetActive = false;
-    public int BtnTargetLevel = 60;
+    public int BtnTargetLevel = 80;
 }

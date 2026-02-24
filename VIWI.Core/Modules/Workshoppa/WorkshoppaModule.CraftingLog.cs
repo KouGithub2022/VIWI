@@ -51,7 +51,8 @@ internal sealed partial class WorkshoppaModule
 
     private void OpenCraftingLog()
     {
-        if (SelectSelectString("craftlog", 0, s => s == _gameStrings.ViewCraftingLog))
+        // Search all entries for the localized "View Crafting Log" entry instead of assuming index 0
+        if (SelectSelectString("craftlog", -1, s => s == _gameStrings.ViewCraftingLog))
             CurrentStage = Stage.SelectCraftCategory;
     }
 

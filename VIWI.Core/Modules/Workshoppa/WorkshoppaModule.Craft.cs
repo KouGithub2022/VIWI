@@ -19,6 +19,7 @@ namespace VIWI.Modules.Workshoppa;
 internal sealed partial class WorkshoppaModule
 {
     private uint? _contributingItemId;
+    private bool _forceDiscontinueNext = false;
 
     private static readonly (uint itemId, int index)[] LevelingTargets =
     {
@@ -120,11 +121,19 @@ internal sealed partial class WorkshoppaModule
 
     private void SelectCraftBranch()
     {
-        if (_configuration.Mode == TurnInMode.Leveling
-            && AnyLevelingTargetsEnabled()
-            && ShouldDiscontinueLevelingProject()
-            && SelectSelectString("Discontinue", 2, s => s.StartsWith("Discontinue project.", StringComparison.Ordinal)))
+        // Attempt to discontinue automatically when leveling flow indicates we should,
+        // or when a previous delivery step set the force flag (no eligible leveling items found).
+        if ((
+                (_configuration.Mode == TurnInMode.Leveling && AnyLevelingTargetsEnabled() && ShouldDiscontinueLevelingProject())
+                || _forceDiscontinueNext
+            )
+            && SelectSelectString("Discontinue", -1, s =>
+                _gameStrings.DiscontinueItem.IsMatch(s) ||
+                s.StartsWith("Discontinue project.", StringComparison.Ordinal) ||
+                s.Contains("中止する", StringComparison.Ordinal)))
         {
+            // clear the force flag if it was set
+            _forceDiscontinueNext = false;
             CurrentStage = Stage.DiscontinueProject;
             _continueAt = DateTime.Now.AddSeconds(1);
         }
@@ -134,7 +143,11 @@ internal sealed partial class WorkshoppaModule
             CurrentStage = Stage.MergeStacks;
             _continueAt = DateTime.Now.AddSeconds(0.5);
         }
-        else if (SelectSelectString("contrib", 0, s => s.StartsWith("Contribute materials.", StringComparison.Ordinal)))
+        else if (SelectSelectString("contrib", -1, s =>
+                     _gameStrings.ContributeItems.IsMatch(s) ||
+                     s.StartsWith("Contribute materials.", StringComparison.Ordinal) ||
+                     s.StartsWith("素材を納品する", StringComparison.Ordinal) ||
+                     s.Contains("納品する", StringComparison.Ordinal)))
         {
             CurrentStage = Stage.ContributeMaterials;
             _continueAt = DateTime.Now.AddSeconds(1);
@@ -231,7 +244,12 @@ internal sealed partial class WorkshoppaModule
         if (targetIndex == -1)
         {
             PluginLog.Information("[Workshoppa] No eligible leveling item found in craft list; will proceed via discontinue/restart logic.");
-            if (ShouldDiscontinueLevelingProject())
+            // Force an attempt to discontinue on the next SelectCraftBranch call, then close the delivery menu
+            // so the module can continue the restart/discontinue flow.
+            _forceDiscontinueNext = true;
+            // Previously this only closed when ShouldDiscontinueLevelingProject() was true,
+            // which could leave the delivery window open and cause this method to be re-entered
+            // repeatedly. Always close here to let higher-level flow decide next steps.
             CurrentStage = Stage.CloseDeliveryMenu;
             _continueAt = DateTime.Now.AddSeconds(2);
             return;
@@ -433,13 +451,27 @@ internal sealed partial class WorkshoppaModule
                 PluginLog.Information($"Turn-in landed: itemId={id}. Remaining this project={st.Remaining}/{MaxTurninsPerProject}");
             }
 
-            if (ShouldDiscontinueLevelingProject())
-            {
-                SaveConfig();
-                CurrentStage = Stage.CloseDeliveryMenu;
-                _continueAt = DateTime.Now.AddSeconds(2);
-                return;
-            }
+                // Debug info: log turnin tracker and discontinue decision
+                try
+                {
+                    foreach (var kv in _turnins)
+                        PluginLog.Verbose($"Turnin status: itemId={kv.Key}, Remaining={kv.Value.Remaining}, Exhausted={kv.Value.Exhausted}");
+                    var should = ShouldDiscontinueLevelingProject();
+                    PluginLog.Information($"ShouldDiscontinueLevelingProject => {should}");
+
+                    if (should)
+                    {
+                        SaveConfig();
+                        PluginLog.Information("Decided to discontinue leveling project; closing delivery menu.");
+                        CurrentStage = Stage.CloseDeliveryMenu;
+                        _continueAt = DateTime.Now.AddSeconds(2);
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    PluginLog.Warning(ex, "Error while evaluating discontinue decision");
+                }
         }
 
         if (craftState.IsPhaseComplete())
